@@ -1,2 +1,0 @@
-# gestionavrajaen
-GESTION ANALITICA AVRA JAEN
