@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVRA Jaén · Control de Incidencias</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --green-dark:#1a3c2e;--green:#2d6a4f;--green-mid:#40916c;--green-light:#74c69d;--green-xlight:#d8f3dc;--green-bg:#f0faf4;
+  --sidebar-w:220px;--bottomnav-h:64px;--bg:#f4f6f5;--surface:#fff;--border:#e4ebe7;--text:#111827;--text-sec:#6b7a74;--text-ter:#a0aea8;
+  --danger:#e63946;--danger-light:#fff0f0;--warning:#f4a261;--warning-light:#fff7ee;
+  --info:#457b9d;--info-light:#eaf2f8;--purple:#6d597a;--purple-light:#f3f0f7;
+  --shadow:0 2px 8px rgba(0,0,0,.07);--shadow-lg:0 8px 24px rgba(0,0,0,.10);
+  --r:16px;--r-sm:10px;--r-xs:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;font-size:14px;background:var(--bg);color:var(--text);}
+
+/* ── LAYOUT ── */
+.app{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:var(--sidebar-w);background:var(--green-dark);display:flex;flex-direction:column;flex-shrink:0;z-index:100;}
+.sidebar-logo{padding:24px 20px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08);}
+.sidebar-logo-icon{width:36px;height:36px;background:var(--green-mid);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.sidebar-logo-icon svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;}
+.sidebar-logo-text{font-size:15px;font-weight:700;color:#fff;}
+.sidebar-logo-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;letter-spacing:.04em;text-transform:uppercase;}
+.sidebar-nav{padding:16px 12px;flex:1;}
+.nav-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);padding:0 8px;margin-bottom:8px;margin-top:16px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-sm);color:rgba(255,255,255,.6);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff;}
+.nav-item.active{background:var(--green-mid);color:#fff;font-weight:600;}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;}
+.nav-badge{margin-left:auto;background:var(--green-light);color:var(--green-dark);font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;}
+.sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,.08);}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{height:64px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;box-shadow:var(--shadow);}
+.topbar-title{font-size:16px;font-weight:700;flex:1;}
+.live-chip{display:flex;align-items:center;gap:5px;background:var(--green-xlight);color:var(--green);padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green-mid);box-shadow:0 0 0 3px rgba(64,145,108,.2);flex-shrink:0;}
+.content-area{flex:1;overflow-y:auto;padding:20px;}
+
+/* ── BOTTOM NAV (móvil/tablet) ── */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--bottomnav-h);background:var(--green-dark);border-top:1px solid rgba(255,255,255,.1);z-index:200;flex-direction:row;align-items:stretch;}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.5);font-size:10px;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;padding:8px 4px;transition:all .15s;}
+.bn-item.active{color:var(--green-light);}
+.bn-item svg{width:20px;height:20px;}
+.bn-badge{background:var(--green-light);color:var(--green-dark);font-size:9px;font-weight:800;padding:1px 5px;border-radius:20px;margin-top:-2px;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;transition:all .15s;}
+.btn:hover{background:var(--green-xlight);border-color:var(--green-light);color:var(--green);}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green);}
+.btn-primary:hover{background:var(--green-dark);}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.btn-danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+
+/* ── RESPONSIVE BREAKPOINTS ── */
+@media(max-width:1024px){
+  .sidebar{display:none;}
+  .bottom-nav{display:flex;}
+  .content-area{padding:16px;padding-bottom:calc(var(--bottomnav-h) + 16px);}
+  .topbar{padding:0 16px;}
+  .topbar-title{font-size:15px;}
+  #dashTab-filters{display:none;}
+  #filterDrawer{display:block;}
+}
+@media(max-width:640px){
+  .content-area{padding:12px;padding-bottom:calc(var(--bottomnav-h) + 12px);}
+  .topbar-title{font-size:14px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .kpi-value{font-size:22px;}
+  .alert-kpis{grid-template-columns:repeat(2,1fr);}
+  .alert-kpi-value{font-size:20px;}
+  .charts-grid{grid-template-columns:1fr;}
+  .modal{margin:8px;border-radius:var(--r-sm);}
+  .modal-body{padding:14px;}
+  .modal-hdr{padding:14px 16px;}
+  .map-shell{grid-template-columns:1fr;height:auto;}
+  #mapSidebar{display:none;}
+}
+
+/* FILTROS */
+.filter-section{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:16px 20px;margin-bottom:20px;box-shadow:var(--shadow);}
+.filter-section-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-sec);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fg label{font-size:10px;font-weight:700;color:var(--text-sec);letter-spacing:.06em;text-transform:uppercase;}
+.fg select,.fg input{border:1.5px solid var(--border);border-radius:20px;padding:7px 14px;font-size:12px;color:var(--text);background:var(--bg);font-family:inherit;outline:none;transition:border-color .15s;min-width:130px;}
+.fg select:focus,.fg input:focus{border-color:var(--green-mid);background:#fff;}
+.filter-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--green-xlight);color:var(--green);border-radius:20px;font-size:11px;font-weight:600;}
+.chip-x{cursor:pointer;font-size:13px;line-height:1;}
+.chip-x:hover{color:var(--danger);}
+
+/* BLOQUES */
+.block-title{font-size:13px;font-weight:700;color:var(--text-sec);letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--green-xlight);display:flex;align-items:center;gap:8px;}
+.block-title span{background:var(--green);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.kpi-card{background:var(--surface);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:all .2s;border:1.5px solid transparent;position:relative;overflow:hidden;}
+.kpi-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--green-light);}
+.kpi-card.featured{background:linear-gradient(135deg,var(--green-dark) 0%,var(--green) 100%);}
+.kpi-card.no-click{cursor:default;}
+.kpi-card.no-click:hover{transform:none;box-shadow:var(--shadow);}
+.kpi-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+.kpi-icon svg{width:18px;height:18px;}
+.kpi-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-sec);margin-bottom:6px;}
+.kpi-card.featured .kpi-label{color:rgba(255,255,255,.7);}
+.kpi-value{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px;}
+.kpi-card.featured .kpi-value{color:#fff;}
+.kpi-sub{font-size:11px;color:var(--text-ter);line-height:1.4;}
+.kpi-card.featured .kpi-sub{color:rgba(255,255,255,.5);}
+
+/* ALERT BLOCK */
+.alert-block{background:linear-gradient(135deg,#fff0f0,#fff5f0);border:1.5px solid #fecaca;border-radius:var(--r);padding:20px 24px;margin-bottom:20px;}
+.alert-block-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--danger);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.alert-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.alert-kpi{background:rgba(255,255,255,.7);border-radius:var(--r-sm);padding:14px;cursor:pointer;transition:all .15s;border:1px solid #fecaca;}
+.alert-kpi:hover{background:#fff;box-shadow:var(--shadow);}
+.alert-kpi.no-click{cursor:default;}
+.alert-kpi.no-click:hover{background:rgba(255,255,255,.7);box-shadow:none;}
+.alert-kpi-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-sec);margin-bottom:6px;}
+.alert-kpi-value{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:3px;}
+.alert-kpi-sub{font-size:10px;color:var(--text-ter);}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.charts-grid.full{grid-template-columns:1fr;}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr;}}
+.card{background:var(--surface);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;border:1.5px solid var(--border);}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+.card-title{font-size:13px;font-weight:700;}
+.card-subtitle{font-size:11px;color:var(--text-ter);background:var(--bg);padding:3px 10px;border-radius:20px;}
+.chart-wrap{position:relative;}
+.chart-wrap.h200{height:200px;}
+.chart-wrap.h260{height:260px;}
+.chart-wrap.h300{height:300px;}
+.chart-wrap.h340{height:340px;}
+.donut-legend{display:flex;flex-direction:column;gap:7px;margin-top:12px;}
+.dl-item{display:flex;align-items:center;justify-content:space-between;font-size:11px;}
+.dl-left{display:flex;align-items:center;gap:7px;color:var(--text-sec);}
+.dl-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+.dl-pct{font-weight:700;}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-ter);padding:8px 10px;border-bottom:1.5px solid var(--border);white-space:nowrap;}
+tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--green-bg);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+.badge.ok{background:var(--green-xlight);color:var(--green);}
+.badge.warn{background:var(--warning-light);color:#c07a30;}
+.badge.danger{background:var(--danger-light);color:#e63946;}
+.badge.neutral{background:var(--bg);color:var(--text-sec);}
+.badge.info{background:var(--info-light);color:#457b9d;}
+.exp-link{color:var(--green);font-weight:700;cursor:pointer;}
+.exp-link:hover{text-decoration:underline;}
+
+/* MAP & DRAWER */
+#mapTab{display:none;}
+.map-shell{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 200px);min-height:500px;position:relative;overflow:hidden;}
+.map-sidebar{background:var(--surface);border-radius:var(--r);padding:16px;overflow-y:auto;box-shadow:var(--shadow);border:1.5px solid var(--border);display:flex;flex-direction:column;gap:12px;}
+.map-sidebar-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-ter);margin-bottom:4px;}
+.legend-pin{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:2px solid rgba(0,0,0,.12);}
+.geo-progress{font-size:11px;color:var(--text-sec);background:var(--bg);border-radius:var(--r-sm);padding:10px 12px;}
+.geo-bar-wrap{background:var(--border);border-radius:20px;height:4px;margin-top:6px;overflow:hidden;}
+.geo-bar{height:4px;border-radius:20px;background:var(--green-mid);transition:width .3s;}
+.map-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.map-stat{background:var(--green-bg);border-radius:var(--r-sm);padding:10px;text-align:center;border:1px solid var(--green-xlight);}
+.map-stat-val{font-size:18px;font-weight:800;color:var(--green);}
+.map-stat-label{font-size:10px;color:var(--text-ter);margin-top:2px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+.map-inc-list{flex:1;overflow-y:auto;}
+.map-inc-item{padding:8px 10px;border-radius:var(--r-sm);cursor:pointer;border:1.5px solid transparent;margin-bottom:4px;}
+.map-inc-item:hover{background:var(--green-bg);border-color:var(--green-xlight);}
+.map-inc-exp{font-size:12px;font-weight:700;color:var(--green);}
+.map-inc-mun{font-size:11px;color:var(--text-sec);margin-top:1px;}
+#map{border-radius:var(--r);border:1.5px solid var(--border);box-shadow:var(--shadow);z-index:1;}
+
+/* DRAWER FLOTANTE DE DETALLE RÁPIDO EN MAPA */
+#mapDetailDrawer{position:absolute;top:0;right:-380px;width:360px;height:100%;background:var(--surface);border-left:1.5px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,0.12);z-index:1000;transition:right .3s ease;display:flex;flex-direction:column;}
+#mapDetailDrawer.open{right:0;}
+.drawer-hdr{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1.5px solid var(--border);background:var(--green-bg);flex-shrink:0;}
+.drawer-hdr h3{font-size:14px;font-weight:700;color:var(--green-dark);}
+.drawer-body{padding:20px;overflow-y:auto;flex:1;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(17,24,39,.5);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;}
+.modal{background:var(--surface);border-radius:var(--r);width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.18);}
+.modal.sm{max-width:860px;}.modal.lg{max-width:1160px;}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1.5px solid var(--border);flex-shrink:0;}
+.modal-hdr h2{font-size:15px;font-weight:700;}
+.modal-hdr-actions{display:flex;gap:8px;}
+.modal-body{overflow:auto;padding:24px;flex:1;}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--text-sec);font-size:20px;padding:4px 8px;border-radius:var(--r-xs);font-family:inherit;line-height:1;}
+.modal-close:hover{background:var(--bg);}
+.ficha-section{margin-bottom:22px;}
+.ficha-section-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-ter);margin-bottom:10px;padding-bottom:7px;border-bottom:1.5px solid var(--border);}
+.ficha-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;}
+.ficha-field .fl{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-ter);margin-bottom:3px;}
+.ficha-field .fv{font-size:13px;font-weight:500;}
+.recl{background:var(--green-bg);border-radius:var(--r-sm);padding:12px 14px;font-size:12px;line-height:1.6;color:var(--text-sec);white-space:pre-wrap;border-left:3px solid var(--green-mid);}
+.placeholder{text-align:center;padding:48px 24px;color:var(--text-ter);}
+.placeholder strong{display:block;font-size:15px;color:var(--text-sec);margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div><div class="sidebar-logo-text">AVRA Jaén</div><div class="sidebar-logo-sub">Serveo · Contrato</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Principal</div>
+      <button class="nav-item active" id="navDash">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" id="navMap">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        Mapa de incidencias
+        <span class="nav-badge" id="navMapBadge">…</span>
+      </button>
+      <div class="nav-label" style="margin-top:20px">Acciones</div>
+      <button class="nav-item" id="navRefresh">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        Actualizar datos
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--green-mid);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">CF</div>
+        <div><div style="font-size:12px;font-weight:600;color:#fff">Serveo AVRA</div><div style="font-size:10px;color:rgba(255,255,255,.4)">Supervisor obras</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="flex:1"><div class="topbar-title">Control de Incidencias — Jaén</div></div>
+      <div class="live-chip"><span class="live-dot"></span><span id="statusText">Cargando…</span></div>
+    </div>
+    <div class="content-area">
+
+      <!-- BLOQUE 1: FILTROS -->
+      <div class="filter-section" id="dashTab-filters">
+        <div class="filter-section-title">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Filtros de búsqueda
+        </div>
+        <div class="filter-row">
+          <div class="fg"><label>Año</label>
+            <select id="filtroAnio"><option value="">— Todos —</option></select>
+          </div>
+          <div class="fg"><label>Fecha desde</label><input type="date" id="filtroDesde"></div>
+          <div class="fg"><label>Hasta</label><input type="date" id="filtroHasta"></div>
+          <div class="fg"><label>Municipio</label>
+            <select id="filtroMunicipio"><option value="">— Todos —</option></select>
+          </div>
+          <div class="fg"><label>Estado</label>
+            <select id="filtroEstado"><option value="">— Todos —</option></select>
+          </div>
+          <div class="fg"><label>Tipología</label>
+            <select id="filtroTipologia"><option value="">— Todas —</option></select>
+          </div>
+          <div class="fg"><label>Filtrar fechas por</label>
+            <select id="filtroTipoFecha">
+              <option value="solicitud">F. Solicitud presupuesto</option>
+              <option value="enviado">F. Enviado a AVRA</option>
+              <option value="aprobacion">F. Aprobación AVRA</option>
+              <option value="facturado">F. Facturado</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <button class="btn btn-primary btn-sm" id="btnAplicar">Aplicar</button>
+            <button class="btn btn-sm" id="btnLimpiar">Limpiar</button>
+          </div>
+        </div>
+        <div class="filter-chips" id="filterChips"></div>
+      </div>
+
+      <!-- CONTENIDO TABS -->
+      <div id="dashTab">
+        <div id="content"><div class="placeholder"><strong>Conectando…</strong>Cargando datos en vivo</div></div>
+      </div>
+      <div id="mapTab">
+        <div class="map-shell">
+          <div class="map-sidebar">
+            <div><div class="map-sidebar-title">Estado · Filtrar</div><div id="mapLegend" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;"></div></div>
+            <div id="geoProgress" style="display:none;" class="geo-progress"><div id="geoText">Geocodificando…</div><div class="geo-bar-wrap"><div class="geo-bar" id="geoBar" style="width:0%"></div></div></div>
+            <div class="map-stats" id="mapStats"></div>
+            <div class="map-sidebar-title" style="margin-top:4px;">Incidencias</div>
+            <div class="map-inc-list" id="mapIncList"></div>
+            <div id="mapNoUbicadas" style="display:none;background:var(--warning-light);border:1.5px solid #fde68a;border-radius:var(--r-sm);padding:10px 12px;margin-top:8px;"></div>
+          </div>
+          
+          <div style="position:relative; flex:1; height:100%;">
+            <div id="map" style="width:100%; height:100%;"></div>
+            
+            <!-- PANEL DRAWER FLOTANTE DE DETALLE RÁPIDO EN MAPA -->
+            <div id="mapDetailDrawer">
+              <div class="drawer-hdr">
+                <h3 id="drawerTitle">Detalle de Incidencia</h3>
+                <button class="modal-close" onclick="closeMapDrawer()">✕</button>
+              </div>
+              <div class="drawer-body" id="drawerBody">
+                <!-- Se rellena dinámicamente -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- BOTTOM NAV (móvil/tablet) -->
+  <nav class="bottom-nav">
+    <button class="bn-item active" id="bnDash">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="bn-item" id="bnMap">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      <span class="bn-badge" id="bnMapBadge">…</span>
+      Mapa
+    </button>
+    <button class="bn-item" id="bnFilter">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      Filtros
+    </button>
+    <button class="bn-item" id="bnRefresh">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      Actualizar
+    </button>
+  </nav>
+
+  <!-- FILTER DRAWER (móvil/tablet) -->
+  <div id="filterDrawer" style="display:none;position:fixed;inset:0;z-index:300;">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,.5)" id="drawerOverlay"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:var(--r) var(--r) 0 0;padding:20px;max-height:85vh;overflow-y:auto;padding-bottom:calc(var(--bottomnav-h) + 20px);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:15px;font-weight:700">Filtros</div>
+        <button class="modal-close" id="drawerClose">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="fg"><label>Año</label><select id="filtroAnio2"><option value="">— Todos —</option></select></div>
+        <div class="fg"><label>Fecha desde</label><input type="date" id="filtroDesde2"></div>
+        <div class="fg"><label>Hasta</label><input type="date" id="filtroHasta2"></div>
+        <div class="fg"><label>Municipio</label><select id="filtroMunicipio2"><option value="">— Todos —</option></select></div>
+        <div class="fg"><label>Estado</label><select id="filtroEstado2"><option value="">— Todos —</option></select></div>
+        <div class="fg"><label>Tipología</label><select id="filtroTipologia2"><option value="">— Todas —</option></select></div>
+        <div class="fg"><label>Filtrar fechas por</label>
+          <select id="filtroTipoFecha2">
+            <option value="solicitud">F. Solicitud presupuesto</option>
+            <option value="enviado">F. Enviado a AVRA</option>
+            <option value="aprobacion">F. Aprobación AVRA</option>
+            <option value="facturado">F. Facturado</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button class="btn btn-primary" style="flex:1" id="btnAplicar2">Aplicar filtros</button>
+          <button class="btn" id="btnLimpiar2">Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<div class="overlay" id="fichaOverlay" style="display:none;">
+  <div class="modal sm">
+    <div class="modal-hdr"><h2 id="fichaTitle">Ficha</h2><button class="modal-close" id="fichaClose">✕</button></div>
+    <div class="modal-body" id="fichaBody"></div>
+  </div>
+</div>
+
+<!-- LISTADO MODAL -->
+<div class="overlay" id="modalOverlay" style="display:none;">
+  <div class="modal lg">
+    <div class="modal-hdr">
+      <h2 id="modalTitle">Incidencias</h2>
+      <div class="modal-hdr-actions">
+        <button class="btn btn-sm" id="btnDescargaExcel">⬇ Excel</button>
+        <button class="btn btn-sm" id="btnDescargaPDF">⬇ PDF</button>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// --- SISTEMA DE VALIDACIÓN DE ACCESO TEMPORAL (COMPACTO) ---
+(function() {
+    const CLAVE_SECRETA = "AVRA_Jaen_Master_Key_2026_Secure_Guard"; 
+
+    function verificarAcceso() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let token = urlParams.get('t') || urlParams.get('token');
+
+        if (!token) {
+            bloquearPantalla("Acceso no autorizado. Se requiere un enlace de invitación válido.");
+            return;
+        }
+
+        try {
+            while (token.length % 4) token += '=';
+            
+            const decoded = JSON.parse(atob(token));
+            const ahora = Math.floor(Date.now() / 1000);
+
+            const user = Array.isArray(decoded) ? decoded[0] : decoded.user;
+            const exp = Array.isArray(decoded) ? decoded[1] : decoded.exp;
+            const sig = Array.isArray(decoded) ? decoded[2] : decoded.sig;
+
+            if (ahora > exp) {
+                bloquearPantalla("Este enlace temporal ha caducado. Solicite un nuevo acceso.");
+                return;
+            }
+
+            const firmaEsperada = btoa(user + "_" + exp + "_" + CLAVE_SECRETA).substring(0, 10);
+            const firmaAntigua = btoa(user + "_" + exp + "_" + CLAVE_SECRETA);
+
+            if (sig !== firmaEsperada && sig !== firmaAntigua) {
+                bloquearPantalla("Enlace de acceso inválido o manipulado.");
+                return;
+            }
+
+            console.log("Acceso concedido para: " + user);
+
+        } catch (e) {
+            bloquearPantalla("Error en el formato del token de acceso.");
+        }
+    }
+
+    function bloquearPantalla(mensaje) {
+        document.addEventListener("DOMContentLoaded", () => {
+            document.body.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#f4f6f5;font-family:sans-serif;color:#111827;text-align:center;padding:20px;">
+                    <div style="background:#fff;padding:40px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.1);max-width:400px;width:100%;border:1.5px solid #e4ebe7;">
+                        <div style="font-size:40px;margin-bottom:15px;">🔒</div>
+                        <h2 style="font-size:18px;color:#e63946;margin-bottom:10px;">Acceso Restringido</h2>
+                        <p style="font-size:13px;color:#6b7a74;line-height:1.5;margin-bottom:20px;">${mensaje}</p>
+                        <div style="font-size:11px;color:#a0aea8;">Gestión de Incidencias · AVRA Jaén</div>
+                    </div>
+                </div>
+            `;
+        });
+        throw new Error("Acceso denegado");
+    }
+
+    verificarAcceso();
+})();
+
+// --- LÓGICA DEL DASHBOARD ---
+const GIST_RAW="https://gist.githubusercontent.com/cferberia-cmd/428e16516bae61ac35c15be1c8b6fd8f/raw/incidencias.json";
+const REFRESH_MS=5*60*1000;
+const GEO_CACHE_KEY='avra_geo_v5';
+const MUN_GEO_CACHE_KEY='avra_mun_geo_v2';
+let charts=[],rawRows=[],filteredRows=[],modalRows=[],modalTitleText='';
+let KEYS={},leafletMap=null,markers=[],currentTab='dash';
+
+let geoCache={};try{geoCache=JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}');}catch(e){geoCache={};}
+let munGeoCache={};try{munGeoCache=JSON.parse(localStorage.getItem(MUN_GEO_CACHE_KEY)||'{}');}catch(e){munGeoCache={};}
+
+let munMarkers={},dirMarkers={};
+let activeEstados=new Set(['Pdte. presupuesto','Pdte. aprobación','Aprobado','Facturado','No procede','Sin estado']);
+
+const norm=s=>s?String(s).trim().toUpperCase().replace(/[\s\n]+/g,' '):'';
+function findKey(row,cands){const ks=Object.keys(row);for(const c of cands){const f=ks.find(k=>norm(k).includes(c));if(f)return f;}return null;}
+function parseNum(v){if(!v&&v!==0)return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.'));return isNaN(n)?0:n;}
+
+function excelDate(v){
+  if(v===null||v===undefined||v==='')return null;
+  if(typeof v==='number'){if(v<1)return null;return new Date(Math.round((v-25569)*86400*1000));}
+  if(typeof v==='string'){
+    const s=v.trim();if(!s)return null;
+    const nu=norm(s);
+    if(nu.includes('NO PROCEDE')||nu.includes('PROCEDE'))return null;
+    const n2=parseFloat(s);
+    if(!isNaN(n2)&&n2>40000)return new Date(Math.round((n2-25569)*86400*1000));
+    if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){const p=s.split('/');const d=new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));return isNaN(d.getTime())?null:d;}
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)){const d=new Date(s);return isNaN(d.getTime())?null:d;}
+    return null;
+  }
+  return null;
+}
+
+const fmtDate=v=>{const d=excelDate(v);return d?d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';};
+const monthKey=d=>d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`:null;
+const monthLabel=k=>{if(!k)return'';const[y,m]=k.split('-');return`${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)-1]} ${y}`;};
+
+const fmtNum=v=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}).format(parseFloat(v||0));
+const euro=v=>new Intl.NumberFormat('es-ES',{maximumFractionDigits:0,useGrouping:true}).format(Math.round(v))+' €';
+const euro2=v=>fmtNum(v)+' €';
+
+function addDiasLab(d,n){let cur=new Date(d),a=0;while(a<n){cur.setDate(cur.getDate()+1);if(cur.getDay()!==0&&cur.getDay()!==6)a++;}return cur;}
+function diasLabTranscurridos(d1,d2){if(!d1||!d2)return 0;let c=0,cur=new Date(d1);cur.setHours(0,0,0,0);const e=new Date(d2);e.setHours(0,0,0,0);while(cur<e){cur.setDate(cur.getDate()+1);if(cur.getDay()!==0&&cur.getDay()!==6)c++;}return c;}
+function diasLabRestantes(d1,d2){if(!d1||!d2)return 0;let c=0,cur=new Date(d1);const e=new Date(d2);while(cur<e){cur.setDate(cur.getDate()+1);if(cur.getDay()!==0&&cur.getDay()!==6)c++;}return c;}
+
+function normEstado(s){
+  s=norm(s);
+  if(s.includes('NO PROCEDE'))return'No procede';
+  if(s.includes('PENDIENTE PRESUPUESTO'))return'Pdte. presupuesto';
+  if(s.includes('PENDIENTE APROBACION')||s.includes('PENDIENTE APROBACIÓN'))return'Pdte. aprobación';
+  if(s.includes('PRESUPUESTO APROBADO'))return'Aprobado';
+  if(s==='FACTURADO')return'Facturado';
+  return s||'Sin estado';
+}
+function normObra(s,estadoServeo){
+  s=norm(s);
+  if(s.includes('FACTURADO'))return'Facturado';
+  if(s.includes('EN EJECUCION')||s.includes('EN EJECUCIÓN'))return'En ejecución';
+  if(s.includes('EJECUTADO'))return'Ejecutado';
+  if(!s&&estadoServeo&&norm(estadoServeo)==='FACTURADO')return'Facturado';
+  return s||'';
+}
+function normProv(s){s=norm(s);if(s.includes('CEION')&&s.includes('ALGUACIL'))return'CEION-Adán Alguacil';if(s.includes('CEION'))return'CEION';if(s.includes('SERVEO'))return'SERVEO';return s||'Sin asignar';}
+
+const ESTADO_COLOR={'Pdte. presupuesto':'#f4a261','Pdte. aprobación':'#457b9d','Aprobado':'#2d6a4f','Facturado':'#6d597a','No procede':'#e63946'};
+function colorForEstado(e){return ESTADO_COLOR[e]||'#6b7a74';}
+
+function alertBadge(s,d){
+  if(s==='excluida')return`<span class="badge neutral">Excluida</span>`;
+  if(s==='cumplido')return`<span class="badge ok">✓ OK</span>`;
+  if(s==='vencido')return`<span class="badge danger">⚠ Vencido</span>`;
+  if(s==='warning')return`<span class="badge warn">⏱ ${d}d</span>`;
+  if(s==='ok')return`<span class="badge ok">✓ ${d}d</span>`;
+  return`<span class="badge neutral">—</span>`;
+}
+function destroyCharts(){charts.forEach(c=>c.destroy());charts=[];}
+
+function processRows(rows){
+  if(!rows.length)return[];
+  const s=rows[0];
+  KEYS={
+    exp:findKey(s,['NUMERO DE EXPEDIENTE','EXPEDIENTE']),
+    titular:findKey(s,['TITULAR O REPRESENTANTE','TITULAR']),
+    telefono:findKey(s,['TELÉFONO','TELEFONO']),
+    tipoVia:findKey(s,['TIPO VÍA','TIPO VIA']),
+    direccion:findKey(s,['DIRECCIÓN','DIRECCION']),
+    numero:findKey(s,['Nº']),
+    bloque:findKey(s,['BLOQUE']),
+    piso:findKey(s,['PISO']),
+    puerta:findKey(s,['PUERTA']),
+    provincia:findKey(s,['PROVINCIA']),
+    reclamacion:findKey(s,['CONTENIDO RECLAMACIÓN','CONTENIDO RECLAMACION']),
+    est:findKey(s,['ESTADO SERVEO']),
+    prov:findKey(s,['PROVEEDOR ASIGNADO','PROVEEDOR']),
+    mun:findKey(s,['MUNICIPIO']),
+    base:findKey(s,['BASE PRESUPUESTO SERVEO']),
+    iva:findKey(s,['IVA']),
+    total:findKey(s,['TOTAL']),
+    obra:findKey(s,['ESTADO OBRA']),
+    tipologia:findKey(s,['TIPOLOGIA','TIPOLOGÍA']),
+    fSolicitud:findKey(s,['FECHA SOLICITUD DE PRESUPUESTO AVRA','FECHA SOLICITUD','FECHA PETICION']),
+    fVisitado:findKey(s,['FECHA VISITADO']),
+    fPresSub:findKey(s,['FECHA PRESUPUESTO SUBCONTRATA','FECHA PRESUPUESTO']),
+    fEnviado:findKey(s,['FECHA ENVIADO A AVRA','ENVIADO A AVRA']),
+    fApr:findKey(s,['FECHA APROBACION AVRA','APROBADO POR AVRA']),
+    fCon:findKey(s,['FECHA CONFORMIDAD INCIDENCIA','FECHA CONFORMIDAD']),
+    fFact:findKey(s,['FECHA FACTURADO','FACTURADO']),
+    penal:findKey(s,['PENALIZACION CONTABILIZADA','PENALIZACION']),
+    posPenal:findKey(s,['POSIBLE PENALIZACION']),
+    plazo:findKey(s,['PLAZO EJECUCION MESES']),
+    prior:findKey(s,['PRIORITARIO']),
+    margen:findKey(s,['MARGEN BRUTO','MARGEN']),
+    obsSub:findKey(s,['OBSERVACIONES SUBCONTRATA']),
+    obsServ:findKey(s,['OBSERVACIONES SERVEO']),
+    baseSub:findKey(s,['BASE PRESUPUESTO SUBCONTRATA'])
+  };
+
+  const HOY=new Date();HOY.setHours(0,0,0,0);
+
+  return rows.map(r=>{
+    const estado=normEstado(KEYS.est?r[KEYS.est]:null);
+    const obraLabel=normObra(KEYS.obra?r[KEYS.obra]:'',KEYS.est?r[KEYS.est]:'');
+    const base=Math.max(0,parseNum(KEYS.base?r[KEYS.base]:0));
+    const baseSub=Math.max(0,parseNum(KEYS.baseSub?r[KEYS.baseSub]:0));
+    
+    let totalRaw = parseNum(KEYS.total ? r[KEYS.total] : 0);
+    if (base > 0 && totalRaw > base * 3) {
+        totalRaw = base * 1.21;
+    }
+    const total = totalRaw;
+
+    const tipologia=KEYS.tipologia?String(r[KEYS.tipologia]||'').trim():'';
+    const estServeoRaw=KEYS.est?String(r[KEYS.est]||''):'';
+    const esAprobadoServeo=estServeoRaw.toUpperCase().includes('PRESUPUESTO APROBADO');
+    const esFacturadoServeo=estServeoRaw.toUpperCase().includes('FACTURADO');
+
+    const margenEuro = base - baseSub;
+    const pctMargenCalculado = base > 0 ? (margenEuro / base) * 100 : 0;
+    const pctMargenExcel = parseNum(KEYS.margen ? r[KEYS.margen] : 0);
+    const margenPctFinal = pctMargenExcel || pctMargenCalculado;
+
+    const penalRawVal=KEYS.penal?r[KEYS.penal]:null;
+    const penalStr=penalRawVal?String(penalRawVal).trim():'';
+    const penalNum=parseFloat(penalStr.replace(/[^\d,.-]/g,'').replace(',','.'));
+    const penalReal=penalStr===''?0:(isNaN(penalNum)?base*0.1:penalNum);
+    const esPenalizada=penalStr!=='';
+
+    const posPenal=KEYS.posPenal?String(r[KEYS.posPenal]||'').trim():'';
+
+    const fFactRawVal=KEYS.fFact?r[KEYS.fFact]:null;
+    const fFactStr=fFactRawVal?norm(String(fFactRawVal)):'';
+    const fFactDate=(!fFactStr||fFactStr.includes('NO PROCEDE')||fFactStr.includes('PROCEDE'))?null:excelDate(fFactRawVal);
+    const estadoNorm=norm(KEYS.est?r[KEYS.est]:'');
+    const esFacturada=fFactDate!==null||estadoNorm==='FACTURADO';
+    const fFact=fFactDate;
+
+    const fSolVal=excelDate(KEYS.fSolicitud?r[KEYS.fSolicitud]:null);
+    const fEnvVal=excelDate(KEYS.fEnviado?r[KEYS.fEnviado]:null);
+    const fAprVal=excelDate(KEYS.fApr?r[KEYS.fApr]:null);
+    const fConVal=excelDate(KEYS.fCon?r[KEYS.fCon]:null);
+    const fVisVal=excelDate(KEYS.fVisitado?r[KEYS.fVisitado]:null);
+    const fPresSubVal=excelDate(KEYS.fPresSub?r[KEYS.fPresSub]:null);
+
+    const excluida=(obraLabel==='Facturado'||estado==='No procede'||esFacturada);
+
+    let p1Status='sin-fecha',p1Dias=null;
+    if(!excluida&&fSolVal){
+      const lim1=addDiasLab(fSolVal,3);
+      if(fEnvVal){p1Status=fEnvVal<=lim1?'cumplido':'vencido';}
+      else{const dr=diasLabRestantes(HOY,lim1);if(HOY>lim1){p1Status='vencido';}else if(dr<=3){p1Status='warning';p1Dias=dr;}else{p1Status='ok';p1Dias=dr;}}
+    }
+
+    let semaforoPpto = 'ok';
+    let diasPdtePpto = 0;
+    if (estado === 'Pdte. presupuesto' && fSolVal) {
+      diasPdtePpto = diasLabTranscurridos(fSolVal, HOY);
+      if (diasPdtePpto > 3) semaforoPpto = 'rojo';
+      else if (diasPdtePpto >= 2) semaforoPpto = 'amarillo';
+      else semaforoPpto = 'verde';
+    }
+
+    let pen60=null,pen60Dias=null;
+    let aviso15=false;
+    let enPlazoPlat=false;
+
+    if(esAprobadoServeo && !esFacturadoServeo && fAprVal!==null){
+      const dt=diasLabTranscurridos(fAprVal,HOY);
+      if(dt > 45 && dt <= 60){
+        aviso15=true;
+        pen60='aviso';
+        pen60Dias=60-dt;
+      }
+      else if(dt > 60){
+        pen60='vencida';
+        pen60Dias=dt-60;
+      }
+      else if(dt <= 60){
+        enPlazoPlat=true;
+        pen60='plazo';
+        pen60Dias=60-dt;
+      }
+    }
+
+    const diasTramitacion=(fSolVal&&fAprVal)?diasLabTranscurridos(fSolVal,fAprVal):null;
+    const diasRespuestaSub=(fSolVal&&fPresSubVal)?diasLabTranscurridos(fSolVal,fPresSubVal):null;
+    const diasEnvioAvra=(fSolVal&&fEnvVal)?diasLabTranscurridos(fSolVal,fEnvVal):null;
+    const diasAprobacionAvra=(fEnvVal&&fAprVal)?diasLabTranscurridos(fEnvVal,fAprVal):null;
+
+    const mu=KEYS.mun?String(r[KEYS.mun]||'').trim():'';
+    const pr=KEYS.provincia?String(r[KEYS.provincia]||'').trim():'Jaén';
+    const tv=KEYS.tipoVia?norm(r[KEYS.tipoVia]):'';
+    const di=KEYS.direccion?String(r[KEYS.direccion]||'').trim():'';
+    const nu=KEYS.numero?String(r[KEYS.numero]||'').trim():'';
+    const bl=KEYS.bloque?String(r[KEYS.bloque]||'').trim():'';
+    const pi=KEYS.piso?String(r[KEYS.piso]||'').trim():'';
+    const pu=KEYS.puerta?String(r[KEYS.puerta]||'').trim():'';
+    const fullAddr=[tv,di,nu,bl,pi,pu,mu,pr,'España'].filter(Boolean).join(', ');
+
+    return{raw:r,exp:r[KEYS.exp]||'—',municipio:mu,estado,obraLabel,prov:normProv(KEYS.prov?r[KEYS.prov]:null),
+      base,baseSub,margenEuro,margenPct:margenPctFinal,total,tipologia,penalReal,esPenalizada,posPenal,excluida,esFacturada,
+      fSol:fSolVal,fEnv:fEnvVal,fApr:fAprVal,fCon:fConVal,fFact,fVis:fVisVal,fPresSub:fPresSubVal,
+      p1Status,p1Dias,pen60,pen60Dias,aviso15,enPlazoPlat,diasTramitacion,diasRespuestaSub,diasEnvioAvra,diasAprobacionAvra,
+      semaforoPpto,diasPdtePpto,
+      prior:!!(KEYS.prior&&r[KEYS.prior]&&norm(r[KEYS.prior])!==''),
+      fullAddr,geoKey:fullAddr.toLowerCase()};
+  });
+}
+
+function syncDrawerToBar(){
+  ['Anio','Desde','Hasta','Municipio','Estado','Tipologia','TipoFecha'].forEach(k=>{
+    const bar=document.getElementById('filtro'+k);
+    const drw=document.getElementById('filtro'+k+'2');
+    if(bar&&drw){
+      if(drw.type==='date')drw.value=bar.value;
+      else drw.value=bar.value;
+    }
+  });
+}
+function syncBarToDrawer(){
+  ['Anio','Municipio','Estado','Tipologia','TipoFecha'].forEach(k=>{
+    const bar=document.getElementById('filtro'+k);
+    const drw=document.getElementById('filtro'+k+'2');
+    if(bar&&drw)bar.value=drw.value;
+  });
+  const d=document.getElementById('filtroDesde2');const h=document.getElementById('filtroHasta2');
+  if(d)document.getElementById('filtroDesde').value=d.value;
+  if(h)document.getElementById('filtroHasta').value=h.value;
+}
+function openDrawer(){syncDrawerToBar();document.getElementById('filterDrawer').style.display='block';}
+function closeDrawer(){document.getElementById('filterDrawer').style.display='none';}
+function populateDrawer(){
+  ['Anio','Municipio','Estado','Tipologia'].forEach(k=>{
+    const bar=document.getElementById('filtro'+k);
+    const drw=document.getElementById('filtro'+k+'2');
+    if(bar&&drw)drw.innerHTML=bar.innerHTML;
+  });
+}
+function getDateForField(row,campo){
+  if(campo==='solicitud')return row.fSol;
+  if(campo==='enviado')return row.fEnv;
+  if(campo==='aprobacion')return row.fApr;
+  if(campo==='facturado')return row.fFact;
+  return row.fSol;
+}
+
+function applyFilters(){
+  const anio=document.getElementById('filtroAnio').value;
+  const dv=document.getElementById('filtroDesde').value;
+  const hv=document.getElementById('filtroHasta').value;
+  const desde=dv?new Date(dv):null;
+  const hasta=hv?new Date(hv):null;
+  const mun=document.getElementById('filtroMunicipio').value;
+  const est=document.getElementById('filtroEstado').value;
+  const tipo=document.getElementById('filtroTipologia').value;
+  const campo=document.getElementById('filtroTipoFecha').value;
+
+  filteredRows=rawRows.filter(r=>{
+    if(anio){
+      const fechas=[r.fSol,r.fEnv,r.fApr,r.fFact,r.fCon].filter(Boolean);
+      const match=fechas.some(f=>f.getFullYear()===parseInt(anio));
+      if(!match)return false;
+    }
+    const fd=getDateForField(r,campo);
+    if(desde&&(!fd||fd<desde))return false;
+    if(hasta){const h=new Date(hasta);h.setHours(23,59,59);if(!fd||fd>h)return false;}
+    if(mun&&r.municipio!==mun)return false;
+    if(est&&r.estado!==est)return false;
+    if(tipo&&r.tipologia!==tipo)return false;
+    return true;
+  });
+
+  updateFilterChips();
+  if(currentTab==='dash')renderDashboard();else renderMap();
+}
+
+function limpiarFiltros(){
+  ['filtroAnio','filtroMunicipio','filtroEstado','filtroTipologia','filtroTipoFecha'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.selectedIndex=0;
+  });
+  document.getElementById('filtroDesde').value='';
+  document.getElementById('filtroHasta').value='';
+  filteredRows=[...rawRows];
+  updateFilterChips();
+  if(currentTab==='dash')renderDashboard();else renderMap();
+}
+
+function updateFilterChips(){
+  const chips=[];
+  const anio=document.getElementById('filtroAnio').value;
+  const dv=document.getElementById('filtroDesde').value;
+  const hv=document.getElementById('filtroHasta').value;
+  const mun=document.getElementById('filtroMunicipio').value;
+  const est=document.getElementById('filtroEstado').value;
+  const tipo=document.getElementById('filtroTipologia').value;
+  if(anio)chips.push(`Año: ${anio}`);
+  if(dv)chips.push(`Desde: ${dv}`);
+  if(hv)chips.push(`Hasta: ${hv}`);
+  if(mun)chips.push(`Municipio: ${mun}`);
+  if(est)chips.push(`Estado: ${est}`);
+  if(tipo)chips.push(`Tipología: ${tipo}`);
+  document.getElementById('filterChips').innerHTML=chips.map(c=>`<span class="chip">${c}<span class="chip-x" onclick="limpiarFiltros()">×</span></span>`).join('');
+}
+
+function populateFiltros(){
+  const anios=new Set(),municipios=new Set(),estados=new Set(),tipologias=new Set();
+  rawRows.forEach(r=>{
+    [r.fSol,r.fEnv,r.fApr,r.fFact,r.fCon].filter(Boolean).forEach(f=>anios.add(f.getFullYear()));
+    if(r.municipio&&r.municipio!=='—')municipios.add(r.municipio);
+    if(r.estado)estados.add(r.estado);
+    if(r.tipologia)tipologias.add(r.tipologia);
+  });
+  const pop=(id,items,cur)=>{
+    const el=document.getElementById(id);if(!el)return;
+    const first=el.options[0].text;
+    el.innerHTML=`<option value="">${first}</option>`+[...items].sort((a,b)=>typeof a==='number'?b-a:String(a).localeCompare(String(b))).map(v=>`<option value="${v}"${v==cur?' selected':''}>${v}</option>`).join('');
+  };
+  pop('filtroAnio',[...anios],document.getElementById('filtroAnio').value);
+  pop('filtroMunicipio',municipios,document.getElementById('filtroMunicipio').value);
+  pop('filtroEstado',estados,document.getElementById('filtroEstado').value);
+  pop('filtroTipologia',tipologias,document.getElementById('filtroTipologia').value);
+  populateDrawer();
+}
+
+function openFicha(row){
+  const r=row.raw;
+  const field=(l,v)=>`<div class="ficha-field"><div class="fl">${l}</div><div class="fv">${v||'—'}</div></div>`;
+  const dir=[KEYS.tipoVia?norm(r[KEYS.tipoVia]):'',KEYS.direccion?r[KEYS.direccion]:'',KEYS.numero?r[KEYS.numero]:'',KEYS.bloque?r[KEYS.bloque]:'',KEYS.piso?r[KEYS.piso]:'',KEYS.puerta?r[KEYS.puerta]:''].filter(v=>v&&String(v).trim()).join(' ');
+  document.getElementById('fichaTitle').textContent=`Expediente ${row.exp}`;
+  document.getElementById('fichaBody').innerHTML=`
+    <div class="ficha-section"><div class="ficha-section-title">Datos del titular</div><div class="ficha-grid">
+      ${field('Nº Expediente',`<strong style="font-size:15px;color:var(--green)">${row.exp}</strong>`)}
+      ${field('Titular',KEYS.titular?r[KEYS.titular]:null)}
+      ${field('Teléfono',KEYS.telefono?r[KEYS.telefono]:null)}
+      ${field('Municipio',row.municipio+(KEYS.provincia&&r[KEYS.provincia]?' · '+r[KEYS.provincia]:''))}
+      ${field('Dirección',dir||null)}
+      ${field('Tipología',row.tipologia||null)}
+    </div></div>
+    <div class="ficha-section"><div class="ficha-section-title">Estado y plazos</div><div class="ficha-grid">
+      ${field('Estado SERVEO',`<span class="badge" style="background:${colorForEstado(row.estado)}20;color:${colorForEstado(row.estado)}">${row.estado}</span>`)}
+      ${field('Estado obra',row.obraLabel||null)}
+      ${field('Proveedor',row.prov)}
+      ${field('Prioritario',row.prior?'<span class="badge danger">⚡ Sí</span>':'No')}
+      <div class="ficha-field"><div class="fl">Plazo ppto. (3d lab.)</div><div class="fv">${alertBadge(row.p1Status,row.p1Dias)}</div></div>
+      <div class="ficha-field"><div class="fl">Ejec. 60d lab.</div><div class="fv">${row.pen60?`<span class="badge ${row.pen60==='vencida'?'danger':row.pen60==='aviso'?'warn':'ok'}">${row.pen60==='vencida'?'⚠ Vencida +'+row.pen60Dias+'d':row.pen60==='aviso'?'⏱ '+row.pen60Dias+'d restantes':'✓ '+row.pen60Dias+'d restantes'}</span>`:'—'}</div></div>
+      ${row.diasTramitacion!==null?field('Días tramitación',row.diasTramitacion+' días lab.'):field('Días tramitación','—')}
+    </div></div>
+    <div class="ficha-section"><div class="ficha-section-title">Fechas clave</div><div class="ficha-grid">
+      ${field('F. Solicitud',KEYS.fSolicitud?fmtDate(r[KEYS.fSolicitud]):null)}
+      ${field('F. Visitado',KEYS.fVisitado?fmtDate(r[KEYS.fVisitado]):null)}
+      ${field('F. Enviado a AVRA',KEYS.fEnviado?fmtDate(r[KEYS.fEnviado]):null)}
+      ${field('F. Aprobación AVRA',KEYS.fApr?fmtDate(r[KEYS.fApr]):null)}
+      ${field('F. Conformidad',KEYS.fCon?fmtDate(r[KEYS.fCon]):null)}
+      ${field('F. Facturado',KEYS.fFact?fmtDate(r[KEYS.fFact]):null)}
+    </div></div>
+    <div class="ficha-section"><div class="ficha-section-title">Importes y Margen</div><div class="ficha-grid">
+      ${field('Base SERVEO',row.base>0?`<strong style="color:var(--green);font-size:14px">${euro2(row.base)}</strong>`:null)}
+      ${field('Base Subcontrata',row.baseSub>0?euro2(row.baseSub):null)}
+      ${field('Margen Bruto (€)',euro2(row.margenEuro))}
+      ${field('% Margen Bruto',fmtNum(row.margenPct)+'%')}
+      ${field('Total c/IVA',row.total>0?euro2(row.total):null)}
+      ${field('Penalización contab.',row.esPenalizada?penalStr(r):null)}
+      ${field('Posible penalización',row.posPenal||null)}
+    </div></div>
+    ${KEYS.reclamacion&&r[KEYS.reclamacion]?`<div class="ficha-section"><div class="ficha-section-title">Contenido de la reclamación</div><div class="recl">${r[KEYS.reclamacion]}</div></div>`:''}
+    ${KEYS.obsServ&&r[KEYS.obsServ]?`<div class="ficha-section"><div class="ficha-section-title">Observaciones SERVEO</div><div class="recl">${r[KEYS.obsServ]}</div></div>`:''}
+  `;
+  document.getElementById('fichaOverlay').style.display='flex';
+}
+function penalStr(r){const v=KEYS.penal?r[KEYS.penal]:'';return v?String(v).trim():'—';}
+window._openFichaExp=exp=>{
+  const row=rawRows.find(r=>r.exp===exp);
+  if(row){
+    closeMapDrawer();
+    openFicha(row);
+  }
+};
+
+// --- FUNCIÓN PARA EL DRAWER FLOTANTE DE DETALLE RÁPIDO EN MAPA ---
+function openMapDrawer(row){
+  const r=row.raw;
+  const field=(l,v)=>`<div class="ficha-field" style="margin-bottom:12px;"><div class="fl" style="font-size:10px;font-weight:700;color:var(--text-ter);text-transform:uppercase;">${l}</div><div class="fv" style="font-size:13px;font-weight:500;margin-top:2px;">${v||'—'}</div></div>`;
+  const dir=[KEYS.tipoVia?norm(r[KEYS.tipoVia]):'',KEYS.direccion?r[KEYS.direccion]:'',KEYS.numero?r[KEYS.numero]:'',KEYS.bloque?r[KEYS.bloque]:'',KEYS.piso?r[KEYS.piso]:'',KEYS.puerta?r[KEYS.puerta]:''].filter(v=>v&&String(v).trim()).join(' ');
+  
+  document.getElementById('drawerTitle').textContent=`Expediente ${row.exp}`;
+  document.getElementById('drawerBody').innerHTML=`
+    ${field('Titular', KEYS.titular?r[KEYS.titular]:null)}
+    ${field('Municipio', row.municipio)}
+    ${field('Dirección', dir||null)}
+    ${field('Estado SERVEO', `<span class="badge" style="background:${colorForEstado(row.estado)}20;color:${colorForEstado(row.estado)}">${row.estado}</span>`)}
+    ${field('Proveedor', row.prov)}
+    ${field('Base SERVEO', row.base>0?`<strong style="color:var(--green)">${euro2(row.base)}</strong>`:null)}
+    ${field('Margen Bruto', euro2(row.margenEuro)+' ('+fmtNum(row.margenPct)+'%)')}
+    ${field('F. Solicitud', KEYS.fSolicitud?fmtDate(r[KEYS.fSolicitud]):null)}
+    ${field('F. Aprobación', KEYS.fApr?fmtDate(r[KEYS.fApr]):null)}
+    <div style="margin-top:20px;">
+      <button onclick="window._openFichaExp('${row.exp}')" style="width:100%;padding:10px;background:var(--green);color:#fff;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;">Ver ficha completa →</button>
+    </div>
+  `;
+  document.getElementById('mapDetailDrawer').classList.add('open');
+}
+function closeMapDrawer(){
+  document.getElementById('mapDetailDrawer').classList.remove('open');
+}
+
+function openModal(title,rows){
+  modalTitleText=title;modalRows=rows;
+  document.getElementById('modalTitle').textContent=`${title} (${rows.length})`;
+  if(!rows.length){document.getElementById('modalBody').innerHTML='<div class="placeholder"><strong>Sin resultados</strong></div>';document.getElementById('modalOverlay').style.display='flex';return;}
+  document.getElementById('modalBody').innerHTML=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Expediente</th><th>Municipio</th><th>Proveedor</th><th>Tipología</th><th>Estado</th>
+    <th>F.Solicitud</th><th>F.Enviado</th><th>F.Aprobación</th>
+    <th>Base SERVEO</th><th>Margen %</th><th style="text-align:right">Total</th>
+  </tr></thead><tbody>${rows.map(r=>`<tr>
+    <td><span class="exp-link" data-exp="${r.exp}">${r.exp}</span></td>
+    <td>${r.municipio}</td><td>${r.prov}</td><td>${r.tipologia||'—'}</td>
+    <td><span class="badge" style="background:${colorForEstado(r.estado)}20;color:${colorForEstado(r.estado)}">${r.estado}</span></td>
+    <td>${r.fSol?fmtDate(r.raw[KEYS.fSolicitud]):'—'}</td>
+    <td>${r.fEnv?fmtDate(r.raw[KEYS.fEnviado]):'—'}</td>
+    <td>${r.fApr?fmtDate(r.raw[KEYS.fApr]):'—'}</td>
+    <td>${r.base>0?euro2(r.base):'—'}</td>
+    <td><strong style="color:${r.margenPct<20?'var(--danger)':'var(--green)'}">${fmtNum(r.margenPct)}%</strong></td>
+    <td style="text-align:right">${r.total>0?euro2(r.total):'—'}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+  document.getElementById('modalOverlay').style.display='flex';
+}
+function descargarExcel(){
+  const data=modalRows.map(r=>({'Expediente':r.exp,'Municipio':r.municipio,'Proveedor':r.prov,'Tipología':r.tipologia,'Estado':r.estado,'F.Solicitud':r.fSol?fmtDate(r.raw[KEYS.fSolicitud]):'','F.Enviado':r.fEnv?fmtDate(r.raw[KEYS.fEnviado]):'','F.Aprobación':r.fApr?fmtDate(r.raw[KEYS.fApr]):'','Base SERVEO':r.base,'Base Subcontrata':r.baseSub,'Margen Euro':r.margenEuro,'Margen Pct':r.margenPct,'Total':r.total}));
+  const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Incidencias');XLSX.writeFile(wb,`${modalTitleText.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+}
+function descargarPDF(){
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${modalTitleText}</title><style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}h2{margin-bottom:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px}th{background:#f0f0f0;font-weight:600}@media print{button{display:none!important}}</style></head><body><h2>${modalTitleText}</h2><p style="font-size:10px;color:#888;margin-bottom:10px">Generado: ${new Date().toLocaleString('es-ES')}</p>${document.getElementById('modalBody').innerHTML}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// --- GEOCODIFICACIÓN SEGURA SIN ERRORES DE CORS Y CON CACHÉ LOCAL ---
+async function geocodeMun(mun,intentos=3){
+  if(munGeoCache[mun])return munGeoCache[mun];
+  for(let i=0;i<intentos;i++){
+    try{
+      const q=encodeURIComponent(`${mun}, Jaén, España`);
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=es`,{headers:{'Accept-Language':'es'}});
+      if(!res.ok){
+        if(res.status===429){
+          await sleep(3000*(i+1));
+          continue;
+        }
+        await sleep(2000*(i+1));
+        continue;
+      }
+      const d=await res.json();
+      if(d&&d[0]){
+        const c={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
+        munGeoCache[mun]=c;
+        try{localStorage.setItem(MUN_GEO_CACHE_KEY,JSON.stringify(munGeoCache));}catch(err){}
+        return c;
+      }
+      break;
+    }catch(e){
+      await sleep(2000*(i+1));
+    }
+  }
+  return null;
+}
+
+async function geocodeDir(row,intentos=3){
+  if(geoCache[row.geoKey])return geoCache[row.geoKey];
+  for(let i=0;i<intentos;i++){
+    try{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(row.fullAddr)}&format=json&limit=1&countrycodes=es`,{headers:{'Accept-Language':'es'}});
+      if(!res.ok){
+        if(res.status===429){
+          await sleep(3000*(i+1));
+          continue;
+        }
+        await sleep(2000*(i+1));
+        continue;
+      }
+      const d=await res.json();
+      if(d&&d[0]){
+        const c={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
+        geoCache[row.geoKey]=c;
+        try{localStorage.setItem(GEO_CACHE_KEY,JSON.stringify(geoCache));}catch(err){}
+        return c;
+      }
+      break;
+    }catch(e){
+      await sleep(2000*(i+1));
+    }
+  }
+  return null;
+}
+
+function mkPin(color,size=26){const h=Math.round(size*1.36);return L.divIcon({html:`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${h}" viewBox="0 0 28 38"><path d="M14 0C6.27 0 0 6.27 0 14c0 9.63 14 24 14 24S28 23.63 28 14C28 6.27 21.73 0 14 0z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="6" fill="white" opacity=".9"/></svg>`,iconSize:[size,h],iconAnchor:[size/2,h],popupAnchor:[0,-h],className:''});}
+function mkCluster(color,n){return L.divIcon({html:`<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="${color}" stroke="white" stroke-width="2.5" opacity=".92"/><text x="22" y="27" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="${n>9?12:14}" font-weight="800" fill="white">${n}</text></svg>`,iconSize:[44,44],iconAnchor:[22,22],popupAnchor:[0,-22],className:''});}
+
+function buildMapLegend(rows){
+  const ESTADOS=[{key:'Pdte. presupuesto',color:'#f4a261'},{key:'Pdte. aprobación',color:'#457b9d'},{key:'Aprobado',color:'#2d6a4f'},{key:'Facturado',color:'#6d597a'},{key:'No procede',color:'#e63946'},{key:'Sin estado',color:'#6b7a74'}];
+  const counts={};rows.forEach(r=>{counts[r.estado]=(counts[r.estado]||0)+1;});
+  const el=document.getElementById('mapLegend');if(!el)return;
+  el.innerHTML=ESTADOS.map(e=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:8px" onmouseover="this.style.background='var(--green-bg)'" onmouseout="this.style.background='transparent'">
+    <input type="checkbox" ${activeEstados.has(e.key)?'checked':''} data-estado="${e.key}" style="accent-color:${e.color};width:13px;height:13px;cursor:pointer">
+    <span class="legend-pin" style="background:${e.color}"></span>
+    <span style="font-size:12px;color:var(--text-sec);flex:1">${e.key}</span>
+    <span style="font-size:11px;font-weight:700;color:var(--text-ter)">${counts[e.key]||0}</span>
+  </label>`).join('')+`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="selectAllEstados(true)" class="btn btn-sm" style="flex:1">✓ Todos</button><button onclick="selectAllEstados(false)" class="btn btn-sm" style="flex:1">✕ Ninguno</button></div>`;
+  el.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',()=>{if(cb.checked)activeEstados.add(cb.dataset.estado);else activeEstados.delete(cb.dataset.estado);applyMapFilter();}));
+}
+function applyMapFilter(){
+  if(!leafletMap)return;
+  Object.values(munMarkers).forEach(m=>m.remove());munMarkers={};
+  const vis=filteredRows.filter(r=>activeEstados.has(r.estado));
+  const byMun={};vis.forEach(r=>{if(!byMun[r.municipio])byMun[r.municipio]=[];byMun[r.municipio].push(r);});
+  Object.entries(byMun).forEach(([mun,munRows])=>{
+    const coords=munGeoCache[mun];if(!coords)return;
+    const ec={};munRows.forEach(r=>{ec[r.estado]=(ec[r.estado]||0)+1;});
+    const dom=Object.entries(ec).sort((a,b)=>b[1]-a[1])[0][0];
+    const icon=munRows.length===1?mkPin(colorForEstado(dom)):mkCluster(colorForEstado(dom),munRows.length);
+    const m=L.marker([coords.lat,coords.lng],{icon}).addTo(leafletMap);
+    m.bindPopup(L.popup({maxWidth:300}).setContent(popupMun(mun,munRows)));
+    munMarkers[mun]=m;
+  });
+  Object.entries(dirMarkers).forEach(([exp,marker])=>{const row=filteredRows.find(r=>r.exp===exp);if(row&&activeEstados.has(row.estado)){if(!leafletMap.hasLayer(marker))marker.addTo(leafletMap);}else if(leafletMap.hasLayer(marker))marker.remove();});
+  const list=document.getElementById('mapIncList');
+  if(list)list.querySelectorAll('.map-inc-item').forEach(item=>{const row=filteredRows.find(r=>r.exp===item.dataset.exp);item.style.display=(row&&activeEstados.has(row.estado))?'block':'none';});
+}
+window.selectAllEstados=val=>{activeEstados=new Set(val?['Pdte. presupuesto','Pdte. aprobación','Aprobado','Facturado','No procede','Sin estado']:[]);document.querySelectorAll('#mapLegend input[type=checkbox]').forEach(cb=>{cb.checked=val;});applyMapFilter();};
+function popupMun(mun,rows){return`<div style="font-family:-apple-system,sans-serif;min-width:230px;max-width:290px"><div style="font-size:13px;font-weight:700;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #e4ebe7">${mun} <span style="font-size:11px;color:#6b7a74">${rows.length} incidencia${rows.length>1?'s':''}</span></div><div style="max-height:260px;overflow-y:auto">${rows.map(r=>`<div onclick="window._openDrawerFromPopup('${r.exp}')" style="padding:7px 8px;border-radius:8px;cursor:pointer;margin-bottom:4px;background:#f4f6f5;border:1px solid #e4ebe7" onmouseover="this.style.background='#d8f3dc'" onmouseout="this.style.background='#f4f6f5'"><div style="font-size:12px;font-weight:700;color:#2d6a4f">${r.exp}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${colorForEstado(r.estado)}20;color:${colorForEstado(r.estado)}">${r.estado}</span>${r.base>0?`<span style="font-size:10px;color:#6b7a74">${euro2(r.base)}</span>`:''}</div></div>`).join('')}</div></div>`;}
+window._openDrawerFromPopup=exp=>{
+  const row=rawRows.find(r=>r.exp===exp);
+  if(row){
+    leafletMap.closePopup();
+    openMapDrawer(row);
+  }
+};
+function renderNoUbicadas(sinDir,noGeo){const todas=[...new Map([...sinDir,...noGeo].map(r=>[r.exp,r])).values()];const el=document.getElementById('mapNoUbicadas');if(!el)return;if(!todas.length){el.style.display='none';return;}el.style.display='block';el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"><div style="display:flex;align-items:center;gap:6px"><span>⚠️</span><span style="font-size:12px;font-weight:700;color:var(--warning)">Sin ubicar</span><span style="background:var(--warning-light);color:#c07a30;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:700">${todas.length}</span></div><span style="font-size:11px;color:var(--text-ter)">▼</span></div><div style="display:none">${todas.map(r=>`<div onclick="window._openFichaExp('${r.exp}')" style="padding:7px 8px;border-radius:8px;cursor:pointer;margin-bottom:4px;background:#fff;border:1px solid #fde68a"><div style="font-size:12px;font-weight:700;color:var(--green)">${r.exp}</div><div style="font-size:11px;color:var(--text-sec)">${r.municipio}</div><div style="font-size:10px;color:#c07a30;margin-top:2px;font-weight:600">${!r.fullAddr||r.fullAddr.replace(/,/g,'').replace(/España/i,'').trim().length<=5?'⚠ Sin dirección':'⚠ Dirección no encontrada'}</div></div>`).join('')}</div>`;}
+
+async function renderMap(){
+  const rows=filteredRows;
+  if(!leafletMap){leafletMap=L.map('map',{zoomControl:true}).setView([37.9,-3.4],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19}).addTo(leafletMap);}
+  markers.forEach(m=>m.remove());markers=[];Object.values(munMarkers).forEach(m=>m.remove());munMarkers={};Object.values(dirMarkers).forEach(m=>m.remove());dirMarkers={};
+  buildMapLegend(rows);
+  document.getElementById('mapStats').innerHTML=`<div class="map-stat"><div class="map-stat-val">${rows.length}</div><div class="map-stat-label">Total</div></div><div class="map-stat"><div class="map-stat-val" style="color:var(--danger)">${rows.filter(r=>r.pen60==='vencida').length}</div><div class="map-stat-label">Vencidas</div></div><div class="map-stat"><div class="map-stat-val" style="color:var(--green)">${rows.filter(r=>r.estado==='Aprobado').length}</div><div class="map-stat-label">Aprobadas</div></div><div class="map-stat"><div class="map-stat-val" style="color:var(--warning)">${rows.filter(r=>r.estado==='Pdte. presupuesto').length}</div><div class="map-stat-label">Pdte.ppto.</div></div>`;
+  document.getElementById('navMapBadge').textContent=rows.length;
+  document.getElementById('mapIncList').innerHTML=rows.map(r=>`<div class="map-inc-item" data-exp="${r.exp}"><div class="map-inc-exp">${r.exp}</div><div class="map-inc-mun">${r.municipio}</div><div style="margin-top:4px"><span class="badge" style="background:${colorForEstado(r.estado)}18;color:${colorForEstado(r.estado)}">${r.estado}</span></div></div>`).join('');
+  const sinDir=[],byMun={};rows.forEach(r=>{if(!r.fullAddr||r.fullAddr.replace(/,/g,'').replace(/España/i,'').trim().length<=5)sinDir.push(r);if(!byMun[r.municipio])byMun[r.municipio]=[];byMun[r.municipio].push(r);});
+  const munList=Object.keys(byMun);
+  const progEl=document.getElementById('geoProgress'),progText=document.getElementById('geoText'),progBar=document.getElementById('geoBar');
+  progEl.style.display='block';const munBounds=[];
+  
+  for(let i=0;i<munList.length;i++){
+    const mun=munList[i],munRows=byMun[mun];
+    if(!munGeoCache[mun])await sleep(1500);
+    const coords=await geocodeMun(mun);
+    if(!coords)continue;
+    munBounds.push([coords.lat,coords.lng]);
+    const ec={};munRows.forEach(r=>{ec[r.estado]=(ec[r.estado]||0)+1;});
+    const dom=Object.entries(ec).sort((a,b)=>b[1]-a[1])[0][0];
+    const vRows=munRows.filter(r=>activeEstados.has(r.estado));
+    if(!vRows.length)continue;
+    const icon=vRows.length===1?mkPin(colorForEstado(dom)):mkCluster(colorForEstado(dom),vRows.length);
+    const m=L.marker([coords.lat,coords.lng],{icon}).addTo(leafletMap);
+    m.bindPopup(L.popup({maxWidth:300}).setContent(popupMun(mun,munRows)));
+    munMarkers[mun]=m;markers.push(m);
+    progText.textContent=`Municipios: ${i+1}/${munList.length}`;
+    progBar.style.width=Math.round((i+1)/munList.length*100)+'%';
+  }
+  if(munBounds.length)leafletMap.fitBounds(munBounds,{padding:[40,40],maxZoom:12});setTimeout(()=>leafletMap.invalidateSize(),100);
+  
+  const noGeo=[],toRefine=rows.filter(r=>!geoCache[r.geoKey]);
+  for(let i=0;i<toRefine.length;i++){
+    if(currentTab!=='map')break;
+    const row=toRefine[i];
+    if(!geoCache[row.geoKey])await sleep(1500);
+    const coords=await geocodeDir(row);
+    if(!coords){noGeo.push(row);continue;}
+    if(!activeEstados.has(row.estado))continue;
+    const dm=L.marker([coords.lat,coords.lng],{icon:mkPin(colorForEstado(row.estado),22)}).addTo(leafletMap);
+    dm.on('click',()=>openMapDrawer(row));
+    dirMarkers[row.exp]=dm;markers.push(dm);
+    progText.textContent=`Precisando: ${i+1}/${toRefine.length}`;
+    progBar.style.width=Math.round((i+1)/toRefine.length*100)+'%';
+  }
+  progEl.style.display='none';renderNoUbicadas(sinDir,noGeo);
+  document.getElementById('mapIncList').addEventListener('click',e=>{const item=e.target.closest('[data-exp]');if(!item)return;const row=filteredRows.find(r=>r.exp===item.dataset.exp);if(!row)return;const dm=dirMarkers[row.exp];if(dm){leafletMap.setView(dm.getLatLng(),16,{animate:true});openMapDrawer(row);return;}const mm=munMarkers[row.municipio];if(mm){leafletMap.setView(mm.getLatLng(),13,{animate:true});mm.openPopup();}else openFicha(row);});
+}
+
+function renderDashboard(){
+  destroyCharts();
+  const rows=filteredRows;
+  if(!rows.length){document.getElementById('content').innerHTML='<div class="placeholder"><strong>Sin resultados</strong>Prueba a cambiar los filtros</div>';return;}
+
+  const munC={},munBase={},tipoC={},tipoBase={},tipoMargen={};
+  const provCount={},provDiasSub={},provBase={};
+  let sBase=0,sBaseSub=0,sTotal=0,nPrior=0;
+  const mesesSolicitud={},mesesEnviado={},mesesApr={},mesesFact={},mesesRiesgo={};
+  let sumaDiasTram=0,nDiasTram=0,nEnPlazo=0,nTotal3d=0;
+
+  let sumDiasSolicitudSub=0, nDiasSolicitudSub=0;
+  let sumDiasEnvioAvra=0, nDiasEnvioAvra=0;
+  let sumDiasAprobacionAvra=0, nDiasAprobacionAvra=0;
+
+  const pdteVerde = rows.filter(r=>r.semaforoPpto==='verde');
+  const pdteAmarillo = rows.filter(r=>r.semaforoPpto==='amarillo');
+  const pdteRojo = rows.filter(r=>r.semaforoPpto==='rojo');
+
+  const pen60Vencidas=rows.filter(r=>r.pen60==='vencida');
+  const pen60Aviso=rows.filter(r=>r.aviso15===true);
+  const pen60Plazo=rows.filter(r=>r.enPlazoPlat===true);
+
+  const importePenalBase=pen60Vencidas.reduce((s,r)=>s+r.base,0);
+  const importePenal10=importePenalBase*0.1;
+
+  const tipologiaData = {};
+  const aprobacionMesData = {};
+
+  const munTipologiaMap = {};
+  const setTipologias = new Set();
+
+  rows.forEach(r=>{
+    const mun = r.municipio || 'Sin municipio';
+    const tip = r.tipologia || 'Sin tipología';
+    setTipologias.add(tip);
+
+    if(!munTipologiaMap[mun]) munTipologiaMap[mun] = {};
+    if(!munTipologiaMap[mun][tip]) munTipologiaMap[mun][tip] = { count: 0, base: 0 };
+    munTipologiaMap[mun][tip].count++;
+    munTipologiaMap[mun][tip].base += r.base;
+
+    if(r.municipio){munC[r.municipio]=(munC[r.municipio]||0)+1;munBase[r.municipio]=(munBase[r.municipio]||0)+r.base;}
+    
+    if(!tipologiaData[tip]) tipologiaData[tip] = { count: 0, base: 0 };
+    tipologiaData[tip].count++;
+    tipologiaData[tip].base += r.base;
+
+    if(r.fApr) {
+      const mKey = monthKey(r.fApr);
+      if(!aprobacionMesData[mKey]) aprobacionMesData[mKey] = { count: 0, base: 0 };
+      aprobacionMesData[mKey].count++;
+      aprobacionMesData[mKey].base += r.base;
+    }
+
+    if(r.tipologia){
+      tipoC[r.tipologia]=(tipoC[r.tipologia]||0)+1;
+      tipoBase[r.tipologia]=(tipoBase[r.tipologia]||0)+r.base;
+      tipoMargen[r.tipologia]=(tipoMargen[r.tipologia]||[]).concat(r.margenPct);
+    }
+
+    if(r.prov){
+      provCount[r.prov]=(provCount[r.prov]||0)+1;
+      provBase[r.prov]=(provBase[r.prov]||0)+r.base;
+      if(r.diasRespuestaSub!==null){
+        if(!provDiasSub[r.prov])provDiasSub[r.prov]=[];
+        provDiasSub[r.prov].push(r.diasRespuestaSub);
+      }
+    }
+
+    if(r.diasRespuestaSub !== null){ sumDiasSolicitudSub += r.diasRespuestaSub; nDiasSolicitudSub++; }
+    if(r.diasEnvioAvra !== null){ sumDiasEnvioAvra += r.diasEnvioAvra; nDiasEnvioAvra++; }
+    if(r.diasAprobacionAvra !== null){ sumDiasAprobacionAvra += r.diasAprobacionAvra; nDiasAprobacionAvra++; }
+
+    sBase+=r.base;
+    sBaseSub+=r.baseSub;
+    sTotal+=r.total;
+
+    if(r.prior)nPrior++;
+    if(r.diasTramitacion!==null){sumaDiasTram+=r.diasTramitacion;nDiasTram++;}
+    if(!r.excluida&&r.fSol){nTotal3d++;if(r.p1Status==='cumplido'||r.p1Status==='ok'||r.p1Status==='warning')nEnPlazo++;}
+
+    const addMes=(obj,d,val=1)=>{if(d){const k=monthKey(d);obj[k]=(obj[k]||{n:0,base:0});obj[k].n+=val;obj[k].base+=r.base;}};
+    addMes(mesesSolicitud,r.fSol);
+    addMes(mesesEnviado,r.fEnv);
+    addMes(mesesApr,r.fApr);
+    addMes(mesesFact,r.fFact);
+    if(r.pen60==='vencida'||r.pen60==='aviso') addMes(mesesRiesgo,r.fApr,1);
+  });
+
+  const rowsProc=rows.filter(r=>r.estado!=='No procede'&&!r.tipologia.toUpperCase().includes('NO PROCEDE'));
+
+  const enviados=rowsProc.filter(r=>r.fEnv!==null);
+  const aprobadas=rowsProc.filter(r=>r.estado==='Aprobado');
+  const pendPpto=rowsProc.filter(r=>r.estado==='Pdte. presupuesto');
+  const pendApr=rowsProc.filter(r=>r.estado==='Pdte. aprobación');
+  const facturadas=rowsProc.filter(r=>r.esFacturada||r.obraLabel==='Facturado');
+
+  const munArr=Object.entries(munC).map(([n,v])=>({name:n,count:v,base:munBase[n]||0})).sort((a,b)=>b.count-a.count);
+  const tipoArr=Object.entries(tipoC).map(([n,v])=>{
+    const arrM=tipoMargen[n]||[0];
+    const avgM=arrM.reduce((a,b)=>a+b,0)/arrM.length;
+    return {name:n,count:v,base:tipoBase[n]||0,margenAvg:avgM};
+  }).sort((a,b)=>b.base-a.base);
+
+  const tipologiaArraySorted = Object.entries(tipologiaData).map(([name, data])=>({name, ...data})).sort((a,b)=>b.base - a.base);
+  const aprobacionMesArraySorted = Object.entries(aprobacionMesData).map(([mKey, data])=>({mKey, label: monthLabel(mKey), ...data})).sort((a,b)=>a.mKey.localeCompare(b.mKey));
+
+  const provArr=Object.entries(provCount).map(([n,v])=>{
+    const arrD=provDiasSub[n]||[0];
+    const avgD=arrD.length?Math.round(arrD.reduce((a,b)=>a+b,0)/arrD.length):0;
+    const pBase=provBase[n]||0;
+    const pMargenEuro=rows.filter(r=>r.prov===n).reduce((acc,r)=>acc+r.margenEuro,0);
+    const pMargenPct=pBase>0?(pMargenEuro/pBase)*100:0;
+    const pEnCurso=rows.filter(r=>r.prov===n && r.estado!=='Facturado' && r.estado!=='No procede').length;
+    return {name:n,count:v,base:pBase,diasAvg:avgD,margenEuro:pMargenEuro,margenPct:pMargenPct,enCurso:pEnCurso};
+  }).sort((a,b)=>b.base-a.base);
+
+  const allMeses=[...new Set([...Object.keys(mesesSolicitud),...Object.keys(mesesEnviado),...Object.keys(mesesApr),...Object.keys(mesesFact)])].sort();
+
+  const margenBrutoGlobalEuro = sBase - sBaseSub;
+  const pctMargenBrutoGlobal = sBase > 0 ? (margenBrutoGlobalEuro / sBase) * 100 : 0;
+
+  document.getElementById('content').innerHTML=`
+
+  <div class="block-title"><span>2</span>Resumen general del período</div>
+  <div class="kpi-grid">
+    <div class="kpi-card featured no-click">
+      <div class="kpi-icon" style="background:rgba(255,255,255,.15)"><svg fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></div>
+      <div class="kpi-label">1. Total en la tabla</div>
+      <div class="kpi-value">${rawRows.length}</div>
+      <div class="kpi-sub">Incluye "No procede"</div>
+    </div>
+    <div class="kpi-card featured" id="kpiTotalProc">
+      <div class="kpi-icon" style="background:rgba(255,255,255,.15)"><svg fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+      <div class="kpi-label">2. Total en el período</div>
+      <div class="kpi-value">${rowsProc.length}</div>
+      <div class="kpi-sub">Sin incluir "No procede"</div>
+    </div>
+    <div class="kpi-card" id="kpiEnviados">
+      <div class="kpi-icon" style="background:var(--info-light)"><svg fill="none" stroke="#457b9d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></div>
+      <div class="kpi-label">3. Enviados a AVRA</div>
+      <div class="kpi-value" style="color:var(--info)">${enviados.length}</div>
+      <div class="kpi-sub">Suma: ${euro2(enviados.reduce((s,r)=>s+r.base,0))}</div>
+    </div>
+    <div class="kpi-card" id="kpiAprobadas">
+      <div class="kpi-icon" style="background:var(--green-xlight)"><svg fill="none" stroke="#2d6a4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+      <div class="kpi-label">4. Presupuestos aprobados</div>
+      <div class="kpi-value" style="color:var(--green)">${aprobadas.length}</div>
+      <div class="kpi-sub">Suma: ${euro2(aprobadas.reduce((s,r)=>s+r.base,0))}</div>
+    </div>
+    <div class="kpi-card" id="kpiPdtePpto">
+      <div class="kpi-icon" style="background:var(--warning-light)"><svg fill="none" stroke="#c07a30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
+      <div class="kpi-label">5. Pendiente presupuesto</div>
+      <div class="kpi-value" style="color:var(--warning)">${pendPpto.length}</div>
+      <div class="kpi-sub">Excluye "No procede"</div>
+    </div>
+    <div class="kpi-card" id="kpiPdteApr">
+      <div class="kpi-icon" style="background:var(--info-light)"><svg fill="none" stroke="#457b9d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+      <div class="kpi-label">6. Pendiente de aprobación</div>
+      <div class="kpi-value" style="color:var(--info)">${pendApr.length}</div>
+      <div class="kpi-sub">Suma: ${euro2(pendApr.reduce((s,r)=>s+r.base,0))}</div>
+    </div>
+    <div class="kpi-card" id="kpiFacturadas">
+      <div class="kpi-icon" style="background:var(--purple-light)"><svg fill="none" stroke="#6d597a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+      <div class="kpi-label">7. Incidencias facturadas</div>
+      <div class="kpi-value" style="color:var(--purple)">${facturadas.length}</div>
+      <div class="kpi-sub">Suma: ${euro2(facturadas.reduce((s,r)=>s+r.base,0))}</div>
+    </div>
+    <div class="kpi-card" id="kpiMargenBruto">
+      <div class="kpi-icon" style="background:var(--green-xlight)"><svg fill="none" stroke="#2d6a4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+      <div class="kpi-label">Margen Bruto Global</div>
+      <div class="kpi-value" style="color:var(--green)">${fmtNum(pctMargenBrutoGlobal)}%</div>
+      <div class="kpi-sub">Beneficio: ${euro2(margenBrutoGlobalEuro)}</div>
+    </div>
+  </div>
+
+  <div class="block-title" style="margin-top:8px"><span>3</span>Control de ejecución — Penalizaciones y Semáforo de Pendientes</div>
+  
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px;">
+    <div class="alert-block" style="margin-bottom:0">
+      <div class="alert-block-title">⚠ Seguimiento de plazos — Presupuestos aprobados no facturados</div>
+      <div class="alert-kpis">
+        <div class="alert-kpi" id="kpiVencidas">
+          <div class="alert-kpi-label">9. INCIDENCIAS VENCIDAS (>60d)</div>
+          <div class="alert-kpi-value" style="color:var(--danger)">${pen60Vencidas.length}</div>
+          <div class="alert-kpi-sub">Sup. 60d hábiles aprobados</div>
+        </div>
+        <div class="alert-kpi" id="kpiAviso">
+          <div class="alert-kpi-label">10. Aviso <15 días (>45d)</div>
+          <div class="alert-kpi-value" style="color:var(--warning)">${pen60Aviso.length}</div>
+          <div class="alert-kpi-sub">>45d hábiles desde aprobación</div>
+        </div>
+        <div class="alert-kpi" id="kpiPlazo">
+          <div class="alert-kpi-label">11. Incidencias en plazo (≤60d)</div>
+          <div class="alert-kpi-value" style="color:var(--green)">${pen60Plazo.length}</div>
+          <div class="alert-kpi-sub">Dentro de los 60d hábiles</div>
+        </div>
+        <div class="alert-kpi no-click" id="kpiBasePenal">
+          <div class="alert-kpi-label">12. Base Penalización Actual</div>
+          <div class="alert-kpi-value" style="color:var(--danger);font-size:18px">${euro2(importePenalBase)}</div>
+          <div class="alert-kpi-sub">Base vencidas</div>
+        </div>
+        <div class="alert-kpi no-click" id="kpiPenal10">
+          <div class="alert-kpi-label">13. PENALIZACIÓN ACTUAL 10%</div>
+          <div class="alert-kpi-value" style="color:var(--danger);font-size:18px">${euro2(importePenal10)}</div>
+          <div class="alert-kpi-sub">10% del importe vencido</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-block" style="background:#fff;border-color:var(--border);margin-bottom:0">
+      <div class="alert-block-title" style="color:var(--text-sec)">🚦 Alerta Temprana — Pendientes Presupuesto</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+        <div class="alert-kpi" id="kpiSemRojo" style="border-color:#fecaca;background:var(--danger-light);display:flex;justify-content:space-between;align-items:center;">
+          <div><div class="alert-kpi-label" style="color:var(--danger)">🔴 Crítico (>3 días)</div><div class="alert-kpi-sub">Sin respuesta de subcontrata</div></div>
+          <div class="alert-kpi-value" style="color:var(--danger)">${pdteRojo.length}</div>
+        </div>
+        <div class="alert-kpi" id="kpiSemAmarillo" style="border-color:#fde68a;background:var(--warning-light);display:flex;justify-content:space-between;align-items:center;">
+          <div><div class="alert-kpi-label" style="color:#c07a30">🟡 En Rango (2-3 días)</div><div class="alert-kpi-sub">Requiere seguimiento</div></div>
+          <div class="alert-kpi-value" style="color:#c07a30">${pdteAmarillo.length}</div>
+        </div>
+        <div class="alert-kpi" id="kpiSemVerde" style="border-color:var(--green-light);background:var(--green-xlight);display:flex;justify-content:space-between;align-items:center;">
+          <div><div class="alert-kpi-label" style="color:var(--green)">🟢 Al día (<2 días)</div><div class="alert-kpi-sub">Dentro de plazo inicial</div></div>
+          <div class="alert-kpi-value" style="color:var(--green)">${pdteVerde.length}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block-title" style="margin-top:8px"><span>4</span>Análisis Avanzado de Eficiencia, Cuellos de Botella y Proveedores</div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Análisis de Cuellos de Botella (Tiempos muertos por fase)</span><span class="card-subtitle">Media en días hábiles</span></div>
+      <div class="chart-wrap h260"><canvas id="cuelloBotellaChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">1. Respuesta Media por Subcontrata</span><span class="card-subtitle">Días hábiles en elaborar presupuesto</span></div>
+      <div class="chart-wrap h260"><canvas id="provChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Matriz de Carga de Trabajo y Rendimiento por Subcontrata</span>
+      <span class="card-subtitle">Volumen, incidencias en curso y rentabilidad</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Proveedor / Subcontrata</th>
+            <th>Total Expedientes</th>
+            <th>En Curso</th>
+            <th>Base Acumulada (€)</th>
+            <th>Margen Bruto (€)</th>
+            <th>% Margen Medio</th>
+            <th>Días Medios Presupuesto</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${provArr.map(p => `
+            <tr style="cursor:pointer" onclick="openModal('Incidencias de la subcontrata: ${p.name}', filteredRows.filter(r => r.prov === '${p.name}'))">
+              <td><strong>${p.name}</strong></td>
+              <td>${p.count}</td>
+              <td><span class="badge ${p.enCurso>0?'warn':'ok'}">${p.enCurso} activas</span></td>
+              <td>${euro2(p.base)}</td>
+              <td>${euro2(p.margenEuro)}</td>
+              <td><strong style="color:${p.margenPct<20?'var(--danger)':'var(--green)'}">${fmtNum(p.margenPct)}%</strong></td>
+              <td>${p.diasAvg} días lab.</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-header"><span class="card-title">2. Rentabilidad y Margen Bruto</span><span class="card-subtitle">Base SERVEO vs % Margen por Tipología</span></div>
+      <div class="chart-wrap h260"><canvas id="rentabilidadChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">3. Embudo Operativo de Tramitación</span><span class="card-subtitle">Conversión por fases del servicio</span></div>
+      <div class="chart-wrap h260"><canvas id="funnelChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid full">
+    <div class="card">
+      <div class="card-header"><span class="card-title">4. Facturado Real vs Importe en Riesgo</span><span class="card-subtitle">Evolución por fecha de aprobación</span></div>
+      <div class="chart-wrap h260"><canvas id="riesgoChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="block-title" style="margin-top:8px"><span>5</span>Análisis Operativo y Distribución Geográfica</div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Análisis de incidencias por Tipología</span><span class="card-subtitle">${tipologiaArraySorted.length} tipologías · ${euro(sBase)} base</span></div>
+      <div style="max-height:260px;overflow-y:auto;margin-top:8px;">
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipología</th>
+                <th style="text-align:center">Nº Incidencias</th>
+                <th style="text-align:right">Importe Base Acumulado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tipologiaArraySorted.map(t => `
+                <tr style="cursor:pointer" onclick="openModal('Tipología: ${t.name}', filteredRows.filter(r => (r.tipologia || 'Sin tipología') === '${t.name}'))">
+                  <td><strong>${t.name}</strong></td>
+                  <td style="text-align:center"><span class="badge info">${t.count}</span></td>
+                  <td style="text-align:right"><strong>${euro2(t.base)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Análisis por fecha de aprobado por AVRA</span><span class="card-subtitle">${aprobacionMesArraySorted.length} períodos mensuales</span></div>
+      <div style="max-height:260px;overflow-y:auto;margin-top:8px;">
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes / Período (Aprobado AVRA)</th>
+                <th style="text-align:center">Nº Incidencias</th>
+                <th style="text-align:right">Importe Base Acumulado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${aprobacionMesArraySorted.map(a => `
+                <tr style="cursor:pointer" onclick="openModal('Aprobados AVRA en ${a.label}', filteredRows.filter(r => r.fApr && monthKey(r.fApr) === '${a.mKey}'))">
+                  <td><strong>${a.label}</strong></td>
+                  <td style="text-align:center"><span class="badge ok">${a.count}</span></td>
+                  <td style="text-align:right"><strong>${euro2(a.base)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  ${allMeses.length?`<div class="card">
+    <div class="card-header">
+      <span class="card-title">Evolución mensual por fase</span>
+      <span class="card-subtitle">${monthLabel(allMeses[0])} → ${monthLabel(allMeses[allMeses.length-1])}</span>
+    </div>
+    <div class="chart-wrap h260"><canvas id="fasesChart"></canvas></div>
+  </div>`:''}
+
+  ${munArr.length?`<div class="card">
+    <div class="card-header"><span class="card-title">Incidencias por municipio y tipología</span><span class="card-subtitle">Distribución cruzada de tipologías por municipio</span></div>
+    <div class="chart-wrap" style="height:${Math.max(260,munArr.length*45)}px"><canvas id="munChart"></canvas></div>
+  </div>`:''}
+  `;
+
+  const kpiMap={
+    kpiTotalProc:{title:'2. Incidencias en el período (excluyendo "No procede")', fn:r=>r.estado!=='No procede'&&!r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiEnviados: {title:'3. Presupuestos enviados a AVRA (sin "No procede")', fn:r=>r.fEnv!==null && r.estado!=='No procede'&&!r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiAprobadas:{title:'4. Presupuestos aprobados (sin "No procede")', fn:r=>r.estado==='Aprobado' && !r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiPdtePpto: {title:'5. Pendiente presupuesto (sin "No procede")', fn:r=>r.estado==='Pdte. presupuesto' && !r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiPdteApr:  {title:'6. Pendiente de aprobación (sin "No procede")', fn:r=>r.estado==='Pdte. aprobación' && !r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiFacturadas:{title:'7. Incidencias facturadas (sin "No procede")', fn:r=>(r.esFacturada||r.obraLabel==='Facturado') && r.estado!=='No procede'&&!r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiNoProcede:{title:'8. Incidencias que no proceden', fn:r=>r.estado==='No procede'||r.tipologia.toUpperCase().includes('NO PROCEDE')},
+    kpiMargenBruto:{title:'Incidencias con Margen Bruto Calculado', fn:r=>r.base>0},
+    kpiVencidas: {title:'9. INCIDENCIAS VENCIDAS (>60 días hábiles desde aprobación AVRA)', fn:r=>r.pen60==='vencida'},
+    kpiAviso:    {title:'10. Aviso de incidencias <15 días (>45 días hábiles)', fn:r=>r.aviso15===true},
+    kpiPlazo:    {title:'11. Incidencias en plazo (≤60 días hábiles)', fn:r=>r.enPlazoPlat===true},
+    kpiSemRojo:  {title:'CRÍTICO: Pendiente Presupuesto (>3 días hábiles)', fn:r=>r.semaforoPpto==='rojo'},
+    kpiSemAmarillo:{title:'AVISO: Pendiente Presupuesto (2 a 3 días hábiles)', fn:r=>r.semaforoPpto==='amarillo'},
+    kpiSemVerde: {title:'AL DÍA: Pendiente Presupuesto (<2 días hábiles)', fn:r=>r.semaforoPpto==='verde'}
+  };
+  Object.entries(kpiMap).forEach(([id,{title,fn}])=>{const el=document.getElementById(id);if(el)el.addEventListener('click',()=>openModal(title,filteredRows.filter(fn)));});
+
+  if(document.getElementById('cuelloBotellaChart')){
+    const avgSolSub = nDiasSolicitudSub > 0 ? (sumDiasSolicitudSub / nDiasSolicitudSub).toFixed(1) : 0;
+    const avgEnvAvra = nDiasEnvioAvra > 0 ? (sumDiasEnvioAvra / nDiasEnvioAvra).toFixed(1) : 0;
+    const avgAprAvra = nDiasAprobacionAvra > 0 ? (sumDiasAprobacionAvra / nDiasAprobacionAvra).toFixed(1) : 0;
+
+    const c = new Chart(document.getElementById('cuelloBotellaChart'), {
+      type: 'bar',
+      data: {
+        labels: ['1. Solicitud → Ppto. Subcontrata', '2. Ppto. Subcontrata → Envío AVRA', '3. Envío AVRA → Aprobación AVRA'],
+        datasets: [{
+          label: 'Días hábiles medios de espera',
+          data: [avgSolSub, avgEnvAvra, avgAprAvra],
+          backgroundColor: ['#f4a261', '#457b9d', '#2d6a4f'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { title: { display: true, text: 'Días hábiles promedio' } } }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(provArr.length && document.getElementById('provChart')){
+    const c = new Chart(document.getElementById('provChart'), {
+      type: 'bar',
+      data: {
+        labels: provArr.map(p=>p.name),
+        datasets: [{
+          label: 'Días hábiles medios',
+          data: provArr.map(p=>p.diasAvg),
+          backgroundColor: '#457b9d',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (e, items) => {
+          if (items.length) {
+            const provName = provArr[items[0].index].name;
+            openModal(`Incidencias de la subcontrata: ${provName}`, filteredRows.filter(r => r.prov === provName));
+          }
+        },
+        plugins: { legend: { display: false } },
+        scales: { x: { title: { display: true, text: 'Días hábiles' } } }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(tipoArr.length && document.getElementById('rentabilidadChart')){
+    const c = new Chart(document.getElementById('rentabilidadChart'), {
+      type: 'bar',
+      data: {
+        labels: tipoArr.map(t=>t.name||'Sin tipología'),
+        datasets: [
+          { label: 'Base SERVEO (€)', data: tipoArr.map(t=>Math.round(t.base)), backgroundColor: '#2d6a4f', borderRadius: 4, yAxisID: 'y' },
+          { label: '% Margen Bruto', data: tipoArr.map(t=>parseFloat(t.margenAvg.toFixed(2))), type: 'line', borderColor: '#e63946', backgroundColor: '#e63946', pointRadius: 5, yAxisID: 'y2' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (e, items) => {
+          if (items.length) {
+            const tipoName = tipoArr[items[0].index].name;
+            openModal(`Incidencias por Tipología: ${tipoName}`, filteredRows.filter(r => r.tipologia === tipoName));
+          }
+        },
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          y: { title: { display: true, text: 'Volumen Base (€)' } },
+          y2: { position: 'right', grid: { display: false }, title: { display: true, text: '% Margen' }, ticks: { callback: v => v + '%' } }
+        }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(document.getElementById('funnelChart')){
+    const fasesFunnel = [
+      { label: '1. Solicitadas', count: rowsProc.length, fn: r => true },
+      { label: '2. Enviadas a AVRA', count: enviados.length, fn: r => r.fEnv !== null },
+      { label: '3. Aprobadas por AVRA', count: aprobadas.length, fn: r => r.estado === 'Aprobado' },
+      { label: '4. Facturadas/Ejecutadas', count: facturadas.length, fn: r => r.esFacturada || r.obraLabel === 'Facturado' }
+    ];
+
+    const c = new Chart(document.getElementById('funnelChart'), {
+      type: 'bar',
+      data: {
+        labels: fasesFunnel.map(f=>f.label),
+        datasets: [{
+          label: 'Expedientes',
+          data: fasesFunnel.map(f=>f.count),
+          backgroundColor: ['#74c69d', '#457b9d', '#2d6a4f', '#6d597a'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (e, items) => {
+          if (items.length) {
+            const fase = fasesFunnel[items[0].index];
+            openModal(`Embudo de Tramitación: ${fase.label}`, filteredRows.filter(r => r.estado !== 'No procede' && fase.fn(r)));
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(allMeses.length && document.getElementById('riesgoChart')){
+    const c = new Chart(document.getElementById('riesgoChart'), {
+      type: 'line',
+      data: {
+        labels: allMeses.map(monthLabel),
+        datasets: [
+          { label: 'Base Facturada (€)', data: allMeses.map(m=>mesesFact[m]?Math.round(mesesFact[m].base):0), borderColor: '#2d6a4f', backgroundColor: '#2d6a4f15', fill: true, tension: 0.3 },
+          { label: 'Importe en Riesgo (>45d aprobados)', data: allMeses.map(m=>mesesRiesgo[m]?Math.round(mesesRiesgo[m].base):0), borderColor: '#e63946', backgroundColor: '#e6394615', fill: true, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (e, items) => {
+          if (items.length) {
+            const mKey = allMeses[items[0].index];
+            if (items[0].datasetIndex === 1) {
+              openModal(`Incidencias en Riesgo de Penalización (${monthLabel(mKey)})`, filteredRows.filter(r => (r.pen60==='vencida'||r.pen60==='aviso') && r.fApr && monthKey(r.fApr)===mKey));
+            } else {
+              openModal(`Incidencias Facturadas (${monthLabel(mKey)})`, filteredRows.filter(r => r.fFact && monthKey(r.fFact)===mKey));
+            }
+          }
+        },
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { ticks: { callback: v => '€' + Math.round(v/1000) + 'k' } } }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(allMeses.length&&document.getElementById('fasesChart')){
+    const c=new Chart(document.getElementById('fasesChart'),{
+      type:'bar',
+      data:{
+        labels:allMeses.map(monthLabel),
+        datasets:[
+          {label:'Solicitudes',data:allMeses.map(m=>mesesSolicitud[m]?mesesSolicitud[m].n:0),backgroundColor:'#74c69d',borderRadius:4,yAxisID:'y'},
+          {label:'Enviados a AVRA',data:allMeses.map(m=>mesesEnviado[m]?mesesEnviado[m].n:0),backgroundColor:'#457b9d',borderRadius:4,yAxisID:'y'},
+          {label:'Aprobados',data:allMeses.map(m=>mesesApr[m]?mesesApr[m].n:0),backgroundColor:'#2d6a4f',borderRadius:4,yAxisID:'y'},
+          {label:'Facturados',data:allMeses.map(m=>mesesFact[m]?mesesFact[m].n:0),backgroundColor:'#6d597a',borderRadius:4,yAxisID:'y'},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top'}},
+        scales:{ y:{grid:{color:'#e4ebe7'}} }
+      }
+    });
+    charts.push(c);
+  }
+
+  if(munArr.length&&document.getElementById('munChart')){
+    const munLabels = munArr.map(m=>m.name);
+    const tipologiasArr = [...setTipologias];
+    const palette = ['#2d6a4f', '#40916c', '#74c69d', '#457b9d', '#6d597a', '#f4a261', '#e63946', '#264653', '#2a9d8f', '#e9c46a'];
+
+    const datasetsMun = tipologiasArr.map((tip, idx) => ({
+      label: tip,
+      data: munLabels.map(mun => (munTipologiaMap[mun] && munTipologiaMap[mun][tip]) ? munTipologiaMap[mun][tip].count : 0),
+      backgroundColor: palette[idx % palette.length],
+      borderRadius: 4
+    }));
+
+    const c=new Chart(document.getElementById('munChart'),{
+      type:'bar',
+      data:{
+        labels: munLabels,
+        datasets: datasetsMun
+      },
+      options:{
+        indexAxis:'y',
+        responsive:true,
+        maintainAspectRatio:false,
+        onClick:(e, items)=>{
+          if(items.length){
+            const munName = munLabels[items[0].index];
+            const tipName = tipologiasArr[items[0].datasetIndex];
+            openModal(`Municipio: ${munName} | Tipología: ${tipName}`, filteredRows.filter(r => r.municipio === munName && (r.tipologia || 'Sin tipología') === tipName));
+          }
+        },
+        plugins:{legend:{position:'top'}},
+        scales:{
+          x:{ stacked: true, grid:{color:'#e4ebe7'}, title: { display: true, text: 'Número de incidencias' } },
+          y:{ stacked: true, grid:{display:false} }
+        }
+      }
+    });
+    charts.push(c);
+  }
+}
+
+async function loadData(){
+  document.getElementById('statusText').textContent='Actualizando…';
+  try{
+    const res=await fetch(GIST_RAW+'?t='+Date.now());
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    rawRows=processRows(Array.isArray(json)?json:(json.value||[]));
+    filteredRows=[...rawRows];
+    populateFiltros();
+    const n=rawRows.length;
+    const nb=document.getElementById('navMapBadge');if(nb)nb.textContent=n;
+    const bnb=document.getElementById('bnMapBadge');if(bnb)bnb.textContent=n;
+    if(currentTab==='dash')renderDashboard();else renderMap();
+    document.getElementById('statusText').textContent='Act. '+new Date().toLocaleTimeString('es-ES');
+  }catch(err){
+    document.getElementById('statusText').textContent='Error: '+err.message;
+    document.getElementById('content').innerHTML='<div class="placeholder"><strong>Sin conexión</strong>Verifica que Power Automate has publicado el JSON en el Gist</div>';
+  }
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('navDash').classList.toggle('active',tab==='dash');
+  document.getElementById('navMap').classList.toggle('active',tab==='map');
+  document.getElementById('dashTab').style.display=tab==='dash'?'block':'none';
+  document.getElementById('dashTab-filters').style.display=tab==='dash'?'block':'none';
+  document.getElementById('mapTab').style.display=tab==='map'?'block':'none';
+  if(tab==='map')renderMap();
+}
+
+document.getElementById('bnDash').addEventListener('click',()=>{
+  switchTab('dash');
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('bnDash').classList.add('active');
+});
+document.getElementById('bnMap').addEventListener('click',()=>{
+  switchTab('map');
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('bnMap').classList.add('active');
+});
+document.getElementById('bnFilter').addEventListener('click',openDrawer);
+document.getElementById('bnRefresh').addEventListener('click',loadData);
+document.getElementById('drawerClose').addEventListener('click',closeDrawer);
+document.getElementById('drawerOverlay').addEventListener('click',closeDrawer);
+document.getElementById('btnAplicar2').addEventListener('click',()=>{syncBarToDrawer();applyFilters();closeDrawer();});
+document.getElementById('btnLimpiar2').addEventListener('click',()=>{limpiarFiltros();closeDrawer();});
+
+document.getElementById('navDash').addEventListener('click',()=>switchTab('dash'));
+document.getElementById('navMap').addEventListener('click',()=>switchTab('map'));
+document.getElementById('navRefresh').addEventListener('click',loadData);
+document.getElementById('btnAplicar').addEventListener('click',applyFilters);
+document.getElementById('btnLimpiar').addEventListener('click',limpiarFiltros);
+document.getElementById('modalClose').addEventListener('click',()=>document.getElementById('modalOverlay').style.display='none');
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('modalOverlay'))document.getElementById('modalOverlay').style.display='none';});
+document.getElementById('fichaClose').addEventListener('click',()=>document.getElementById('fichaOverlay').style.display='none');
+document.getElementById('fichaOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('fichaOverlay'))document.getElementById('fichaOverlay').style.display='none';});
+document.getElementById('btnDescargaExcel').addEventListener('click',descargarExcel);
+document.getElementById('btnDescargaPDF').addEventListener('click',descargarPDF);
+document.getElementById('modalBody').addEventListener('click',e=>{const el=e.target.closest('.exp-link');if(!el)return;const row=rawRows.find(r=>r.exp===el.dataset.exp);if(row)openFicha(row);});
+
+loadData();
+setInterval(loadData,REFRESH_MS);
+</script>
+</body>
+</html>
